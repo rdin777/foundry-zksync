@@ -9,6 +9,7 @@ on:
     branches:
       - main
       - "*upstream*"
+      workflow_call:
 
 concurrency:
   cancel-in-progress: true
