@@ -1,20 +1,39 @@
 use alloy_consensus::{Receipt, TxReceipt};
 use alloy_network::{AnyReceiptEnvelope, AnyTransactionReceipt, ReceiptResponse};
 use alloy_primitives::{Address, B256, BlockHash, TxHash, U64};
-use alloy_rpc_types::{Log, TransactionReceipt};
+use alloy_rpc_types::{ConversionError, Log, TransactionReceipt};
 use alloy_serde::WithOtherFields;
 use derive_more::AsRef;
 use op_alloy_consensus::{OpDepositReceipt, OpDepositReceiptWithBloom};
 use serde::{Deserialize, Serialize};
+use tempo_primitives::TEMPO_TX_TYPE_ID;
 
 use crate::FoundryReceiptEnvelope;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, AsRef)]
-pub struct FoundryTxReceipt(WithOtherFields<TransactionReceipt<FoundryReceiptEnvelope<Log>>>);
+pub struct FoundryTxReceipt(pub WithOtherFields<TransactionReceipt<FoundryReceiptEnvelope<Log>>>);
 
 impl FoundryTxReceipt {
     pub fn new(inner: TransactionReceipt<FoundryReceiptEnvelope<Log>>) -> Self {
         Self(WithOtherFields::new(inner))
+    }
+
+    /// Creates a new receipt with a timestamp in the other fields.
+    /// This avoids extra block lookups when timestamp is needed later.
+    pub fn with_timestamp(
+        inner: TransactionReceipt<FoundryReceiptEnvelope<Log>>,
+        timestamp: u64,
+    ) -> Self {
+        let mut receipt = WithOtherFields::new(inner);
+        receipt
+            .other
+            .insert("blockTimestamp".to_string(), serde_json::to_value(timestamp).unwrap());
+        Self(receipt)
+    }
+
+    /// Get block timestamp from other fields if present.
+    pub fn block_timestamp(&self) -> Option<u64> {
+        self.0.other.get_deserialized::<u64>("blockTimestamp").transpose().ok().flatten()
     }
 }
 
@@ -77,7 +96,7 @@ impl ReceiptResponse for FoundryTxReceipt {
 }
 
 impl TryFrom<AnyTransactionReceipt> for FoundryTxReceipt {
-    type Error = ();
+    type Error = ConversionError;
 
     fn try_from(receipt: AnyTransactionReceipt) -> Result<Self, Self::Error> {
         let WithOtherFields {
@@ -118,6 +137,7 @@ impl TryFrom<AnyTransactionReceipt> for FoundryTxReceipt {
                     0x02 => FoundryReceiptEnvelope::Eip1559(receipt_with_bloom),
                     0x03 => FoundryReceiptEnvelope::Eip4844(receipt_with_bloom),
                     0x04 => FoundryReceiptEnvelope::Eip7702(receipt_with_bloom),
+                    TEMPO_TX_TYPE_ID => FoundryReceiptEnvelope::Tempo(receipt_with_bloom),
                     0x7E => {
                         // Construct the deposit receipt, extracting optional deposit fields
                         // These fields may not be present in all receipts, so missing/invalid
@@ -150,7 +170,12 @@ impl TryFrom<AnyTransactionReceipt> for FoundryTxReceipt {
                             logs_bloom: receipt_with_bloom.logs_bloom,
                         })
                     }
-                    _ => return Err(()),
+                    _ => {
+                        let tx_type = r#type;
+                        return Err(ConversionError::Custom(format!(
+                            "Unknown transaction receipt type: 0x{tx_type:02X}"
+                        )));
+                    }
                 },
             },
             other,

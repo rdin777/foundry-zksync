@@ -5,12 +5,14 @@ use crate::{
     constants::{CALLER, CHEATCODE_ADDRESS, DEFAULT_CREATE2_DEPLOYER, TEST_CONTRACT_ADDRESS},
     fork::{CreateFork, ForkId, MultiFork},
     state_snapshot::StateSnapshots,
-    utils::{configure_tx_env, get_blob_base_fee_update_fraction_by_spec_id},
+    utils::{configure_tx_env, get_blob_base_fee_update_fraction},
 };
 use alloy_consensus::Typed2718;
 use alloy_evm::Evm;
 use alloy_genesis::GenesisAccount;
-use alloy_network::{AnyRpcBlock, AnyTxEnvelope, TransactionResponse};
+use alloy_network::{
+    AnyNetwork, AnyRpcBlock, AnyRpcTransaction, AnyTxEnvelope, TransactionResponse,
+};
 use alloy_primitives::{Address, B256, Bytes, TxKind, U256, keccak256, uint};
 use alloy_provider::Provider as _;
 use alloy_rpc_types::{BlockNumberOrTag, Transaction, TransactionRequest};
@@ -24,7 +26,10 @@ use revm::{
     Database, DatabaseCommit, JournalEntry,
     bytecode::Bytecode,
     context::JournalInner,
-    context_interface::{block::BlobExcessGasAndPrice, result::ResultAndState},
+    context_interface::{
+        block::BlobExcessGasAndPrice, journaled_state::account::JournaledAccountTr,
+        result::ResultAndState,
+    },
     database::{CacheDB, DatabaseRef},
     inspector::NoOpInspector,
     precompile::{PrecompileSpecId, Precompiles},
@@ -486,7 +491,7 @@ pub struct Backend {
     pub strategy: BackendStrategy,
 
     /// The access point for managing forks
-    forks: MultiFork,
+    forks: MultiFork<AnyNetwork>,
     // The default in memory db
     mem_db: FoundryEvmInMemoryDB,
     /// The journaled_state to use to initialize new forks with
@@ -546,7 +551,7 @@ impl Backend {
     ///
     /// Prefer using [`spawn`](Self::spawn) instead.
     pub fn new(
-        forks: MultiFork,
+        forks: MultiFork<AnyNetwork>,
         fork: Option<CreateFork>,
         strategy: BackendStrategy,
     ) -> eyre::Result<Self> {
@@ -950,7 +955,7 @@ impl Backend {
 
             commit_transaction(
                 &mut self.strategy,
-                &tx.inner,
+                tx,
                 &mut env.as_env_mut(),
                 journaled_state,
                 fork,
@@ -1399,7 +1404,7 @@ impl DatabaseExt for Backend {
         let fork = self.inner.get_fork_by_id_mut(id)?;
         commit_transaction(
             &mut self.strategy,
-            &tx.inner,
+            &tx,
             &mut env.as_env_mut(),
             journaled_state,
             fork,
@@ -2040,7 +2045,7 @@ fn update_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock) {
     if let Some(excess_blob_gas) = block.header.excess_blob_gas {
         env.block.blob_excess_gas_and_price = Some(BlobExcessGasAndPrice::new(
             excess_blob_gas,
-            get_blob_base_fee_update_fraction_by_spec_id(env.cfg.spec),
+            get_blob_base_fee_update_fraction(env.cfg.chain_id, block.header.timestamp),
         ));
     }
 }
@@ -2050,7 +2055,7 @@ fn update_env_block(env: &mut EnvMut<'_>, block: &AnyRpcBlock) {
 #[allow(clippy::too_many_arguments)]
 fn commit_transaction(
     strategy: &mut BackendStrategy,
-    tx: &Transaction<AnyTxEnvelope>,
+    tx: &AnyRpcTransaction,
     env: &mut EnvMut<'_>,
     journaled_state: &mut JournaledState,
     fork: &mut Fork,

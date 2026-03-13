@@ -160,7 +160,7 @@ impl WalletSigner {
             let _ = api_private_key;
             let _ = organization_id;
             let _ = address;
-            Err(WalletSignerError::UnsupportedSigner("Turnkey"))
+            Err(WalletSignerError::turnkey_unsupported())
         }
     }
 
@@ -322,14 +322,14 @@ impl Signer for WalletSigner {
 #[async_trait]
 impl TxSigner<Signature> for WalletSigner {
     fn address(&self) -> Address {
-        delegate!(self, inner => alloy_signer::Signer::address(inner))
+        Signer::address(self)
     }
 
     async fn sign_transaction(
         &self,
         tx: &mut dyn SignableTransaction<Signature>,
     ) -> alloy_signer::Result<Signature> {
-        delegate!(self, inner => inner.sign_transaction(tx)).await
+        delegate!(self, inner => TxSigner::sign_transaction(inner, tx)).await
     }
 }
 

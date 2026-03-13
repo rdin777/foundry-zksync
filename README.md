@@ -33,16 +33,26 @@ If the answer is not there:
 - Open a [discussion](https://github.com/foundry-rs/foundry/discussions/new) with your question, or
 - Open an issue with [the bug](https://github.com/foundry-rs/foundry/issues/new)
 
-If you want to contribute, or follow along with contributor discussion, you can use our [main telegram](https://t.me/foundry_rs) to chat with us about the development of Foundry!
+Join our [Telegram][tg-url] to chat about the development of Foundry.
 
-## License
+## Support
 
-Licensed under either of [Apache License](./LICENSE-APACHE), Version
-2.0 or [MIT License](./LICENSE-MIT) at your option.
+Having trouble? Check the [Foundry Docs][foundry-docs], join the [support Telegram][tg-support-url], or [open an issue](https://github.com/foundry-rs/foundry/issues/new).
 
+#### License
+
+<sup>
+Licensed under either of <a href="LICENSE-APACHE">Apache License, Version
+2.0</a> or <a href="LICENSE-MIT">MIT license</a> at your option.
+</sup>
+
+<br>
+
+<sub>
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in these crates by you, as defined in the Apache-2.0 license,
 shall be dual licensed as above, without any additional terms or conditions.
+</sub>
 
 ## Acknowledgements
 

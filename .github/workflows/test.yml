@@ -37,9 +37,12 @@ jobs:
           toolchain: ${{ env.TARGET_RUST_VERSION }}
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-      - name: cargo test
-        run: cargo test --doc -p forge
+          toolchain: stable
+          target: ${{ matrix.target }}
+      - uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
+      - uses: taiki-e/install-action@7f491e26f71f4ec2e6902c7c95c73043f209ab79 # v2
+        with:
+          tool: nextest
 
   clippy:
     name: clippy
@@ -143,6 +146,7 @@ jobs:
         env:
           RUST_BACKTRACE: full
           TEST_MAINNET_URL: http://localhost:8011
+          RUST_MIN_STACK: 8388608
         run: |
           ZK_DEBUG_HISTORICAL_BLOCK_HASHES=5 cargo nextest run --no-fail-fast --package '*' --lib --test '*' -E '(test(~zk) or package(~zksync)) and not test(~test_zk_aave_di)'
 

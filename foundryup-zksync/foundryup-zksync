@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xeo pipefail
+set -eo pipefail
 
 # NOTE: if you make modifications to this script, please increment the version number.
 # WARNING: the SemVer pattern: major.minor.patch must be followed as we use it to determine if the script is up to date.
@@ -52,11 +52,6 @@ main() {
         exit 1
     esac; shift
   done
-
-  # Tempo only distributes a subset of the binaries
-  if [[ "$FOUNDRYUP_NETWORK" == "tempo" ]]; then
-    BINS=(forge cast)
-  fi
 
   CARGO_BUILD_ARGS=(--release)
 
@@ -354,9 +349,8 @@ EOF
     case "$uname_str" in
         "Linux")
             os="unknown-linux-gnu"
-            # Note: If `lscpu` isn't guaranteed to be available, 
-            # you may want to fallback to `uname -m`
-            arch=$(lscpu | awk '/Architecture:/{print $2}')
+            # Use uname -m for locale-independent architecture detection
+            arch=$(uname -m)
             ;;
         "Darwin")
             os="apple-darwin"
@@ -669,7 +663,8 @@ tolower() {
 
 compute_sha256() {
   if check_cmd sha256sum; then
-    sha256sum "$1" | cut -d' ' -f1
+    # Use sed to strip leading backslash (sha256sum on Windows/Git Bash outputs \ prefix for binary files)
+    sha256sum "$1" | cut -d' ' -f1 | sed 's/^\\//'
   else
     shasum -a 256 "$1" | awk '{print $1}'
   fi
